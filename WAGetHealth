@@ -1,0 +1,31 @@
+// Author : Stefano Di Cecco
+
+exports.handler = (event, context, callback) => {
+
+var http = require("https");
+
+var options = {
+  hostname: 'wab.verisure-lab.it',
+  path: '/v1/health',
+  method: 'GET',
+  headers: 
+     { 'cache-control': 'no-cache',
+       'Authorization': 'Bearer eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJ1c2VyIjoiYWRtaW4iLCJpYXQiOjE1NDk1Mjg0NTksImV4cCI6MTU1MDEzMzI1OSwid2E6cmFuZCI6LTgxMTg5MDQ4MjgzNDkwNjA5OTR9.0wwe8NzAX4TmVjUyDYLpp0vmaLnwI8zx2OE_JccXKoc',
+       'Content-Type': 'application/json',
+       'Content-Length': 0}
+};
+
+var req = http.request(options, function(res) {
+  res.setEncoding('utf8');
+  res.on('data', function (body) {
+    var parsed = JSON.parse(body);
+    console.log(parsed);
+  });
+});
+req.on('error', function(e) {
+  callback('problem with request: ' + e.message);
+});
+
+req.end();
+    
+};
