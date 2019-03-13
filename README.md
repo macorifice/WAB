@@ -1,5 +1,5 @@
-# WAB
-WhatsApp Business API Lambda
+# WAB WhatsApp Business API Lambda
+
 ![npm](https://img.shields.io/badge/npm-6.5.0-green.svg)
 ![node](https://img.shields.io/badge/node-8.10-blue.svg)
 ![whatsapp](https://img.shields.io/badge/whatsapp-v2.21.4-red.svg)
