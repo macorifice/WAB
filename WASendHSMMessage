@@ -1,0 +1,37 @@
+// Author Stefano Di Cecco
+// Date 15/01/2019
+// Version 1.0
+
+exports.handler = (event, context, callback) => {
+var request = require("request");
+
+var options = { method: 'POST',
+  url: 'https://wab.verisure-lab.it/v1/messages/',
+  headers: 
+   { 'cache-control': 'no-cache',
+     Authorization: 'Bearer '+event.token,
+     'Content-Type': 'application/json' },
+  body: 
+   { to: '39'+event.number,
+     type: 'hsm',
+     hsm: 
+      { namespace: '58f748ab_28c2_82aa_f24e_745f180298b3',
+        element_name: 'step_presa_appuntamento',
+        language: { policy: 'deterministic', code: 'it' },
+        localizable_params: [  
+                            { 'default': event.name },
+                            { 'default': event.day },
+                            { 'default': event.date },
+                            { 'default': event.hour },
+                            { 'default': event.address },
+                            { 'default': event.cap },
+                            { 'default': event.city }
+                            ]
+       } },
+  json: true };
+
+request(options, function (error, response, body) {
+  callback(null, body.messages[0].id);
+  
+});
+}
