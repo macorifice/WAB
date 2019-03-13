@@ -1,0 +1,21 @@
+// Author Stefano Di Cecco
+// Date 28/02/2019
+// Version 1.0
+
+exports.handler = (event, context, callback) => {
+var request = require("request");
+
+var options = { method: 'POST',
+  url: 'https://wab.verisure-lab.it/v1/users/login',
+  headers: 
+   { 'cache-control': 'no-cache',
+     Authorization: 'Basic YmFja2VuZDpWcnNyMjAxOSE=',
+     'Content-Type': 'application/json' } };
+
+request(options, function (error, response, body) {
+  if (error) throw new Error(error);
+
+  console.log(body);
+});
+
+}
