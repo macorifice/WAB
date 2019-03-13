@@ -1,0 +1,198 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Resources for hosting a static website (generated with Hugo for example) on
+  Amazon Simple Storage Service (S3), CloudFront & Lambda@Edge for URI
+  rewriting.
+
+###############################################################################
+Parameters:
+###############################################################################
+
+  AcmCertificateArn:
+    Type: String
+    Description: >
+      The ARN of the SSL certificate to use for the CloudFront distribution.
+
+  DomainName:
+    Type: String
+    Description: The website domain name.
+    Default: lroguet.example
+
+  PriceClass:
+    Type: String
+    Description: The CloudFront distribution price class
+    Default: 'PriceClass_All'
+    AllowedValues:
+      - 'PriceClass_100'
+      - 'PriceClass_200'
+      - 'PriceClass_All'
+
+  TheBucket:
+    Type: String
+    Description: The name of the bucket used to host website
+
+
+################################################################################
+# Outputs:
+################################################################################
+#
+#  TheBucketArn:
+#    Description: The ARN of the S3 bucket hosting the static content.
+#    Value: !GetAtt TheBucket.Arn
+#    Export:
+#      Name: !Sub ${AWS::StackName}-bucket-arn
+
+###############################################################################
+Resources:
+###############################################################################
+
+  TheCloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases:
+          - !Ref DomainName
+        DefaultCacheBehavior:
+          Compress: true
+          ForwardedValues:
+            QueryString: false
+          TargetOriginId: the-s3-bucket
+          ViewerProtocolPolicy: redirect-to-https
+          LambdaFunctionAssociations:
+            - EventType: viewer-request
+              LambdaFunctionARN: !Ref TheViewerRequestLambdaFunctionVersion
+        DefaultRootObject: index.html
+        CustomErrorResponses:
+          - ErrorCachingMinTTL: 300
+            ErrorCode: 403
+            ResponseCode: 404
+            ResponsePagePath: /404.html
+        Enabled: true
+        HttpVersion: http2
+        Origins:
+          - DomainName:
+              !Join [ "", [ !Ref TheBucket, ".s3.amazonaws.com" ] ]
+            Id: the-s3-bucket
+            S3OriginConfig:
+              OriginAccessIdentity:
+                !Join [ "", [ "origin-access-identity/cloudfront/", !Ref TheCloudFrontOriginAccessIdentity ] ]
+        PriceClass: !Ref PriceClass
+        ViewerCertificate:
+          AcmCertificateArn: !Ref AcmCertificateArn
+          MinimumProtocolVersion: TLSv1.1_2016
+          SslSupportMethod: sni-only
+      Tags:
+        - Key: Domain
+          Value: !Ref DomainName
+
+  TheCloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub 'CloudFront OAI for ${DomainName}'
+
+  #TheBucket:
+  #  Type: AWS::S3::Bucket
+  #  Properties:
+  #    BucketEncryption:
+  #      ServerSideEncryptionConfiguration:
+  #        -
+  #          ServerSideEncryptionByDefault:
+  #            SSEAlgorithm: AES256
+  #    Tags:
+  #      - Key: Domain
+  #        Value: !Ref DomainName
+
+  TheBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref TheBucket
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - s3:GetObject
+            Effect: Allow
+            Resource: !Join [ "", [ "arn:aws:s3:::", !Ref TheBucket, "/*" ] ]
+            Principal:
+              CanonicalUser: !GetAtt TheCloudFrontOriginAccessIdentity.S3CanonicalUserId
+
+  TheViewerRequestLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: >
+        Lambda function performing Authentication.
+      Code:
+        ZipFile: |
+          exports.handler = (event, context, callback) => {
+            // Get the request and its headers
+            const request = event.Records[0].cf.request;
+            const headers = request.headers;
+
+            console.log(headers);
+
+            // Specify the username and password to be used
+            const user = 'user';
+            const pw = 'password';
+
+            // Build a Basic Authentication string
+            const authString = 'Basic ' + new Buffer(user + ':' + pw).toString('base64');
+
+            // Challenge for auth if auth credentials are absent or incorrect
+            if (typeof headers.authorization == 'undefined' || headers.authorization[0].value != authString) {
+              const response = {
+                status: '401',
+                statusDescription: 'Unauthorized',
+                body: 'Unauthorized You Shall Not Pass',
+                headers: {
+                  'www-authenticate': [{key: 'WWW-Authenticate', value:'Basic'}]
+                },
+              };
+              callback(null, response);
+            }
+
+            // User has authenticated
+            callback(null, request);
+          };
+      Handler: index.handler
+      MemorySize: 128
+      Role: !Sub ${TheViewerRequestLambdaFunctionExecutionRole.Arn}
+      Runtime: nodejs8.10
+      Tags:
+        - Key: Domain
+          Value: !Ref DomainName
+
+  TheViewerRequestLambdaFunctionVersion:
+    Type: AWS::Lambda::Version
+    Properties:
+      FunctionName: !Ref TheViewerRequestLambdaFunction
+      Description: !Sub "URL rewriting for wab.verisure-lab.it"
+
+  TheViewerRequestLambdaFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - edgelambda.amazonaws.com
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  DNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Join [".",[ !Select [1, !Split ["swswab.", !Ref 'DomainName']],""]]
+      Comment: DNS name for my CloudFront Distribution.
+      Name: !Ref DomainName
+      Type: CNAME
+      TTL: '300'
+      ResourceRecords:
+      - !GetAtt TheCloudFrontDistribution.DomainName
+
+

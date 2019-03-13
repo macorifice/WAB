@@ -1,0 +1,47 @@
+<div style="height: 100vh;">
+        <mat-toolbar class="app-toolbar" color="red">
+          <mat-toolbar-row>
+            <button mat-icon-button (click)="sidenav.toggle()" fxShow="true" fxHide.gt-sm>
+              <mat-icon>menu</mat-icon>
+            </button>
+<!--             <a routerLink="home" routerLinkActive="active" mat-list-item>
+            <span>Whatsapp Business</span>
+            </a> -->
+            <span class="example-spacer"></span>
+          </mat-toolbar-row>
+        </mat-toolbar>
+      
+        <mat-sidenav-container fxFlexFill>
+          <mat-sidenav #sidenav>
+            <mat-nav-list>
+            <a routerLink="home" routerLinkActive="active" mat-list-item>
+                <mat-icon>home</mat-icon>
+                Home
+            </a>
+              <a  routerLink="inviati" routerLinkActive="active" mat-list-item>
+                <mat-icon>markunread</mat-icon>
+                Inviati
+              </a>
+              <a  routerLink="inviati-oggi" routerLinkActive="active" mat-list-item>
+                <mat-icon>message</mat-icon>
+                Inviati Oggi
+              </a>
+              <a  routerLink="ricevuti" routerLinkActive="active" mat-list-item>
+                <mat-icon>notifications</mat-icon>
+                Ricevuti/Oggi</a>
+                <a  routerLink="storico" routerLinkActive="active" mat-list-item>
+                  <mat-icon>collections_bookmark</mat-icon>
+                  Ricevuti/Storico</a>
+                  <a  routerLink="risposte-oggi" routerLinkActive="active" mat-list-item>
+                    <mat-icon>done_outline</mat-icon>
+                    Risposti</a>
+              <a  routerLink="rispondi" routerLinkActive="active" mat-list-item>
+                <mat-icon>account_box</mat-icon>
+                Invia
+              </a>
+            </mat-nav-list>
+          </mat-sidenav>
+          <mat-sidenav-content fxFlexFill><router-outlet></router-outlet>
+        </mat-sidenav-content>
+        </mat-sidenav-container>
+      </div>

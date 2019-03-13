@@ -1,0 +1,20 @@
+[
+  {
+    "ParameterKey": "AcmCertificateArn",
+    "ParameterValue": "arn:aws:acm:us-east-1:780012662733:certificate/1b977fe8-156f-4d1d-ba2a-5570f6b1e6b5"
+  },
+  {
+    "ParameterKey": "DomainName",
+    "ParameterValue": "swswab.verisure-lab.it"
+  },
+  {
+    "ParameterKey": "PriceClass",
+    "ParameterValue": "PriceClass_All"
+  },
+  {
+    "ParameterKey": "TheBucket",
+    "ParameterValue": "wa-be"
+  }
+]
+
+

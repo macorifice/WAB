@@ -1,0 +1,31 @@
+<div class="container">
+    <div class="jumbotron">
+        <div class="container">
+            <h1>Invio wa</h1>
+            <form>
+              <div class="form-group" name="form_send">
+                <label for="name">Destinatario</label>
+                <input #number type="text" class="form-control" id="name" required>
+              </div>
+              <div class="form-group">
+                    <label for="risposta">Risposta</label>
+                    <textarea #risposta rows="4" cols="50" type="text" class="form-control" id="risposta" required></textarea>
+                  </div>
+                <div class="form-group">
+                  <label for="text">Risposte predefinite:</label>
+                  <select #text class="form-control" id="text" name="text" required>
+                    <option value='Ciao, questo canale non è monitorato. Verisure Italia'>Ciao, questo canale non è monitorato. Verisure Italia</option>
+                    <option value='Ciao, l&lsquo;indirizzo del sopralluogo è stato modificato come richiesto. Verisure Italia'>Ciao, l'indirizzo del sopralluogo è stato modificato come richiesto. Verisure Italia</option>
+                    <option value='Ciao, l&lsquo;orario del sopralluogo è stato modificato come richiesto. Verisure Italia'>Ciao, l'orario del sopralluogo è stato modificato come richiesto. Verisure Italia</option>
+                    <option value='Ciao, il tuo indirizzo email è stato modificato come richiesto. Verisure Italia'>Ciao, il tuo indirizzo email è stato modificato come richiesto. Verisure Italia</option>
+                  </select>
+             </div>
+            <br>            
+              <button type="submit" class="btn btn-success" (click)="sendResponse(number.value,text.value)">Invia risposta</button>
+            <br>
+            <br> 
+              <button type="submit" class="btn btn-success" (click)="resolveTicket(number.value,risposta.value,text.value)">Risolvi ticket</button>
+            </form>
+        </div>
+                </div>
+            </div>

@@ -1,0 +1,26 @@
+[
+  {
+    "ParameterKey": "BucketName",
+    "ParameterValue": "wa-be"
+  },
+  {
+    "ParameterKey": "CodeBuildEnvironment",
+    "ParameterValue": "aws/codebuild/ubuntu-base:14.04"
+  },
+  {
+    "ParameterKey": "NotificationEmailAddress",
+    "ParameterValue": "stefano.dicecco@verisure.it "
+  },
+  {
+    "ParameterKey": "RepositoryName",
+    "ParameterValue": "verisure-wab"
+  },
+  {
+    "ParameterKey": "ProjectName",
+    "ParameterValue": "wab"
+  },
+  {
+    "ParameterKey": "DistributionId",
+    "ParameterValue": "E3AJVJLGZEXNVT"
+  }
+]

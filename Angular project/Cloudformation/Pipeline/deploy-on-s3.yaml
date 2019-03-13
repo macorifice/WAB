@@ -1,0 +1,336 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploy a codecommit repo to S3
+Parameters:
+    BucketName:
+        Type: String
+        Description: Name of the bucket where deploy frontend production
+
+    CodeBuildEnvironment:
+        Type: String
+        Description: Docker image to use for CodeBuild container - Use http://amzn.to/2mjCI91 for reference
+        Default: aws/codebuild/ubuntu-base:14.04
+
+    NotificationEmailAddress:
+        Type: String
+        Description: Email to receive information about pipeline
+
+    RepositoryName:
+        Type: String
+        Description: Name of the repository in codecommit, without full url
+
+    BranchName:
+        Type: String
+        Description: Branch to use in pipeline
+        Default: master
+
+    ProjectName:
+        Type: String
+        Description: Service name defined in serverless configuration (https://serverless.com/framework/docs/providers/aws/guide/serverless.yml/)
+
+    DistributionId:
+        Type: String
+        Description: Cloudfront Distribution ID
+
+Resources:
+
+    #########
+    # Build #
+    #########
+
+    # S3 Bucket that CodePipeline/CodeBuild service will use
+    # It will receive both SourceZip (CodeCommit Git HEAD) and BuiltZIP (CodeBuild Artifacts)
+    BuildArtifactsBucket:
+        Type: AWS::S3::Bucket
+
+    CodeBuildServiceRoleProduction:
+        Type: AWS::IAM::Role
+        Properties:
+            Path: !Sub '/managed/${ProjectName}/'
+            AssumeRolePolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  -
+                    Action: 'sts:AssumeRole'
+                    Effect: Allow
+                    Principal:
+                      Service:
+                        - codebuild.amazonaws.com
+            Policies:
+                -
+                  PolicyName: !Sub 'CodeBuildAccess-${ProjectName}'
+                  PolicyDocument:
+                    Version: '2012-10-17'
+                    Statement:
+                      -
+                        Sid: "CodeBuildToCWL"
+                        Effect: Allow
+                        Action:
+                          - 'logs:CreateLogGroup'
+                          - 'logs:CreateLogStream'
+                          - 'logs:PutLogEvents'
+                        Resource:
+                          - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ProjectName}_deploy_production'
+                          - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ProjectName}_deploy_production:*'
+                      -
+                        Sid: "CodeBuildToS3ArtifactRepo"
+                        Effect: Allow
+                        Action:
+                          - s3:*
+                        Resource:
+                          - !Sub arn:aws:s3:::${BuildArtifactsBucket}/*
+                          - !Sub arn:aws:s3:::${BucketName}/*
+                          - !Sub arn:aws:s3:::${BuildArtifactsBucket}
+                          - !Sub arn:aws:s3:::${BucketName}
+                      -
+                        Sid: "ListAllMyBuckets"
+                        Effect: Allow
+                        Action:
+                          - s3:ListAllMyBuckets
+                        Resource:
+                          - arn:aws:s3:::*
+                      -
+                        Sid: "InvalidateDistribution"
+                        Effect: Allow
+                        Action:
+                          - cloudfront:CreateInvalidation
+                        Resource:
+                          - "*"
+                      -
+                        Sid: "OtherRoleForServerless"
+                        Effect: Allow
+                        Action:
+                          - iam:*
+                        Resource:
+                          - !Sub arn:aws:iam::*:role/${ProjectName}*
+
+    CodeBuildProjectProduction:
+        Type: AWS::CodeBuild::Project
+        Properties:
+            Name: !Sub ${ProjectName}_deploy_production
+            Artifacts:
+                Type: CODEPIPELINE
+            Environment:
+                Type: LINUX_CONTAINER
+                ComputeType: BUILD_GENERAL1_SMALL
+                Image: !Sub '${CodeBuildEnvironment}'
+                EnvironmentVariables:
+                  - Name: BUCKET_NAME
+                    Value: !Ref BucketName
+                  - Name: PROJECT_NAME
+                    Value: !Ref ProjectName
+                  - Name: BUILD_ENV
+                    Value: "prod"
+                  - Name: DISTRIBUTION_ID
+                    Value: !Ref DistributionId
+            ServiceRole: !GetAtt CodeBuildServiceRoleProduction.Arn
+            Source:
+                Type: CODEPIPELINE
+                BuildSpec: |
+                  version: 0.2
+                  phases:
+                    install:
+                      commands:
+                      # Download and Install NodeJS 8.0
+                      - curl -sL https://deb.nodesource.com/setup_8.x | sudo -E bash -
+                      - sudo apt-get install -y nodejs
+                      - echo Installing source NPM dependencies...
+                      # Install http drivers for node
+                      - sudo apt-get update -y
+                      - sudo apt-get install -y apt-transport-https
+                      # Install Yarn Package Manager (Replace the commands below if you using NPM).
+                      - curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+                      - echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+                      - sudo apt-get update -y
+                      - sudo apt-get install -y yarn
+                      # Install Angular CLI, If you are not using Angular 6, install angular/cli@1.7.0 or lower, confirm by running ng -v inside your project folder
+                      - yarn global add @angular/cli@6.0.8
+                      # Install node dependancies.
+                      - yarn install
+                    build:
+                      commands:
+                      # Builds Angular application. You can also build using custom environment here like mock or staging
+                      - echo Build started on `date`
+                      - ng build --${BUILD_ENV}
+                    post_build:
+                      commands:
+                      # Clear S3 bucket.
+                      - aws s3 rm s3://${BUCKET_NAME} --recursive  --exclude "assets"
+                      - echo S3 bucket is cleared.
+                      # Copy dist folder to S3 bucket, As of Angular 6, builds are stored inside an app folder in distribution and not at the root of the dist folder
+                      # - aws s3 cp dist s3://${BUCKET_NAME} --recursive --acl public-read
+                      - aws s3 cp dist s3://${BUCKET_NAME} --recursive
+                      - echo Build completed on `date`
+                      # Invalidate index.html
+                      - aws cloudfront create-invalidation --distribution-id ${DISTRIBUTION_ID} --paths /index.html /error.html
+                  artifacts:
+                    files:
+                        - '**/*'
+                    discard-paths: yes
+                    base-directory: 'dist*'
+
+    #############
+    # Pipeline  #
+    #############
+
+    PipelineExecutionRole:
+      Type: AWS::IAM::Role
+      Properties:
+          Path: '/managed/'
+          AssumeRolePolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                -
+                  Action: 'sts:AssumeRole'
+                  Effect: Allow
+                  Principal:
+                    Service:
+                      - codepipeline.amazonaws.com
+          Policies:
+              -
+                PolicyName: !Sub '${ProjectName}-CodePipelinePassRoleAccess'
+                PolicyDocument:
+                  Version: '2012-10-17'
+                  Statement:
+                      -
+                        Action: 'iam:PassRole'
+                        Effect: Allow
+                        Resource:
+                        - !GetAtt CodeBuildServiceRoleProduction.Arn
+              -
+                PolicyName: !Sub '${ProjectName}-CodePipelineS3ArtifactAccess'
+                PolicyDocument:
+                  Version: '2012-10-17'
+                  Statement:
+                      -
+                        Action:
+                          - 's3:GetObject'
+                          - 's3:GetObjectVersion'
+                          - 's3:GetBucketVersioning'
+                          - 's3:PutObject'
+                        Effect: Allow
+                        Resource:
+                          - !Sub 'arn:aws:s3:::${BuildArtifactsBucket}'
+                          - !Sub 'arn:aws:s3:::${BuildArtifactsBucket}/*'
+              -
+                PolicyName: !Sub '${ProjectName}-CodePipelineGitRepoAccess'
+                PolicyDocument:
+                  Version: '2012-10-17'
+                  Statement:
+                      -
+                        Action:
+                          - 'codecommit:GetBranch'
+                          - 'codecommit:GetCommit'
+                          - 'codecommit:UploadArchive'
+                          - 'codecommit:GetUploadArchiveStatus'
+                          - 'codecommit:CancelUploadArchive'
+                        Effect: Allow
+                        Resource: '*'
+              -
+                PolicyName: !Sub '${ProjectName}-CodePipelineBuildAccess'
+                PolicyDocument:
+                  Version: '2012-10-17'
+                  Statement:
+                      -
+                        Action:
+                          - 'codebuild:StartBuild'
+                          - 'codebuild:StopBuild'
+                          - 'codebuild:BatchGetBuilds'
+                        Effect: Allow
+                        Resource:
+                        - !GetAtt CodeBuildProjectProduction.Arn
+              -
+                PolicyName: !Sub '${ProjectName}-CodePipelineSNSAccess'
+                PolicyDocument:
+                  Version: '2012-10-17'
+                  Statement:
+                      -
+                        Action:
+                          - sns:Publish
+                        Effect: Allow
+                        Resource:
+                        - !Ref PipelineNotificationTopic
+    Pipeline:
+        Type: AWS::CodePipeline::Pipeline
+        Properties:
+            ArtifactStore:
+                Location: !Ref BuildArtifactsBucket
+                Type: S3
+            Name: !Sub ${ProjectName}_pipeline
+            RoleArn: !GetAtt PipelineExecutionRole.Arn
+            Stages:
+                -
+                  Name: Source
+                  Actions:
+                    -
+                      Name: CodeCommitRepo
+                      ActionTypeId:
+                        Category: Source
+                        Owner: AWS
+                        Provider: CodeCommit
+                        Version: 1
+                      Configuration:
+                        RepositoryName: !Ref RepositoryName
+                        BranchName: !Ref BranchName
+                      OutputArtifacts:
+                        - Name: SourceZip
+                      RunOrder: 1
+                -
+                  Name: Deploy
+                  Actions:
+                    -
+                      Name: Deploy
+                      ActionTypeId:
+                        Category: Build
+                        Owner: AWS
+                        Provider: CodeBuild
+                        Version: 1
+                      Configuration:
+                        ProjectName: !Ref CodeBuildProjectProduction
+                      InputArtifacts:
+                        - Name: SourceZip
+                      OutputArtifacts:
+                        - Name: BuiltZipDeployProduction
+
+    ######################
+    #   Builder Event    #
+    ######################
+
+    PipelineNotificationTopic:
+          Type: "AWS::SNS::Topic"
+          Properties:
+            Subscription:
+              -
+                Endpoint: !Ref NotificationEmailAddress
+                Protocol: "email"
+            TopicName: !Sub "${ProjectName}-topic"
+
+    PipelineNotificationTopicPolicy:
+      Type: AWS::SNS::TopicPolicy
+      Properties:
+        PolicyDocument:
+          Id: AllowCloudwatchEventsToPublish
+          Version: '2012-10-17'
+          Statement:
+            -
+              Sid: My-statement-id
+              Effect: Allow
+              Principal:
+                Service: "events.amazonaws.com"
+              Action: sns:Publish
+              Resource: !Ref PipelineNotificationTopic
+        Topics:
+          - !Ref PipelineNotificationTopic
+
+Outputs:
+
+        ArtifactRepository:
+            Description: S3 Bucket for Pipeline and Build Artifacts
+            Value: !Ref BuildArtifactsBucket
+
+        CodeBuildServiceRoleProduction:
+            Description: CodeBuild IAM Service Role
+            Value: !GetAtt CodeBuildServiceRoleProduction.Arn
+
+        CodePipelineServiceRole:
+            Description: CodePipeline IAM Service Role
+            Value: !GetAtt PipelineExecutionRole.Arn
