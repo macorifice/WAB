@@ -1,0 +1,21 @@
+var mysql = require('mysql');
+
+// console.log(connection);
+exports.handler = (event, context, callback) => {
+var connection = mysql.createConnection(
+    {host: "wm16dbjld4k7lyi.capgrukwdozk.eu-west-1.rds.amazonaws.com", user: "root", password: "a4ewG4bDsvYHUKVJ", database: "messageStore"}
+);
+    connection.query('SELECT b.profile_name,SUBSTR(key_remote_jid, 1, POSITION("@" IN key_remote_jid) - 1)as number, last_timestamp as sendHH FROM messageStore.chats a, contactStore.wa_contacts b where a.key_remote_jid = b.jid;', function (error, results, fields) {
+ if (error) {
+            connection.destroy();
+            throw error;
+        } else {
+            // connected!
+            callback(error, results);
+            connection.end(function (err) {
+                callback(err, results);
+            });
+        }
+    }
+);
+};
