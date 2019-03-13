@@ -1,0 +1,52 @@
+// Author Stefano Di Cecco
+// Date 01/03/2019
+// Version 1.0
+
+exports.handler = (event, context, callback) => {
+    
+    var request = require("request");
+    var mysql = require('mysql');
+
+    var connection = mysql.createConnection(
+        {host: "wm16dbjld4k7lyi.capgrukwdozk.eu-west-1.rds.amazonaws.com", user: "root", password: "a4ewG4bDsvYHUKVJ", database: "waweb"}
+    );
+
+    connection.query('SELECT token from tokens where username = "backend"  limit 1 ', 
+    function (error, results, fields) {
+    if (error) {
+                connection.destroy();
+                throw error;
+            } else {
+                // connected!
+                
+                //connection.end(function (err) {
+                    //callback(error, results);
+
+                        var options = { method: 'POST',
+                        url: 'https://wab.verisure-lab.it/v1/messages/',
+                        headers: 
+                         { 'cache-control': 'no-cache',
+                           Authorization: 'Bearer '+results[0].token,
+                           'Content-Type': 'application/json' },
+                        body: 
+                         { to: event.number,
+                           type: 'text',
+                           recipient_type: 'individual',
+                           'text': {
+                              'body': event.text
+                            } 
+                          },
+                        json: true };                
+                    
+                    request(options, function (error, response, body) {
+                        callback(null, body);
+                        connection.end(); 
+                    });
+                    
+                   //callback(err, results);
+                //});
+            }
+        }
+    );
+
+    }
