@@ -1,0 +1,9 @@
+CREATE TABLE `waTicket` (
+  `idticket` int(11) NOT NULL AUTO_INCREMENT,
+  `from` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `text_from` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `to` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `text_to` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `last_update_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`idticket`)
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
