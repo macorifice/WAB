@@ -4,7 +4,6 @@
 ![node](https://img.shields.io/badge/node-8.10-blue.svg)
 ![whatsapp](https://img.shields.io/badge/whatsapp-v2.21.4-red.svg)
 ![angular](https://img.shields.io/badge/angular-v7.2.2-red.svg)
-[![](https://img.shields.io/twitter/url/http/shields.io.svg?style=social)](https://twitter.com/macorifice)
 
 # Development server
 Run ng serve for a dev server. Navigate to http://localhost:4200/. The app will automatically reload if you change any of the source files.
